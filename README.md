@@ -17,7 +17,7 @@ A claims platform for motor and property claims: claimants report and track clai
 
 ## Run locally
 
-Prerequisites: Docker, JDK 21, Maven 3.9+, Node 22+.
+Prerequisites: Docker, JDK 21, Maven 3.9+, Node 22.22.3+ or 24.15+ (for the Angular 22 CLI).
 
 ```bash
 # 1. Infrastructure (Postgres + Kafka)
@@ -90,6 +90,36 @@ Real authentication is out of scope. The frontend sends an `X-User-Id` header fo
 | Ben Lim | Officer | `00000000-0000-0000-0000-000000000011` |
 | Chitra Nair | Officer | `00000000-0000-0000-0000-000000000012` |
 | Daniel Wong | Team lead | `00000000-0000-0000-0000-000000000021` |
+
+## Frontend
+
+Angular 22 (standalone components, signals, lazy routes guarded by role), plain SCSS, no UI component library.
+
+**Run it.** Start Postgres, Kafka and both services first (see [Run locally](#run-locally)), then:
+
+```bash
+cd web
+npm install
+npm start          # http://localhost:4200, proxies /api/v1/notifications to :8081 and /api to :8080
+```
+
+Needs Node 22.22.3+ or 24.15+ (the Angular 22 CLI refuses older versions). Other scripts: `npm run build`, `npm test` (Vitest component tests), `npm run api` (regenerates the typed client in `src/app/api/` from `docs/api/openapi.yaml` with ng-openapi-gen; re-export the contract first if an endpoint changed).
+
+**Pick a user** on the start page (top right "Switch user" changes it any time):
+
+| To try | Pick | Where |
+| --- | --- | --- |
+| Report a claim, follow it, answer a question, withdraw | Alice Tan or Raj Kumar | "Report an incident", "My claims", the bell for notifications |
+| Pick up a claim, request information, set the reserve, approve or reject, settle | Ben Lim or Chitra Nair | "Queue" → Pick up → workbench; "My claims" for assigned work |
+| Reassign claims, see all open claims, workload and exposure | Daniel Wong | "Open claims" (status filter), workbench "Reassign", "Dashboard" |
+
+Full lifecycle in about two minutes: Alice reports an incident → Ben picks it up from the queue and requests information → Alice replies from the notification → Ben sets the reserve, approves and settles → Alice sees "Settled" and her notifications.
+
+How it behaves:
+- Action buttons come from the claim's `allowedNext` and the user's role, as returned by the API; the UI does not re-implement the lifecycle (ADR-13).
+- Every command sends the version of the claim on screen. If someone else changed it, the API's "changed by someone else" message is shown and the claim reloads.
+- Lists, claims, notifications and the dashboard refresh every 15 s while the tab is visible, and right away when you come back to the tab (ADR-14).
+- Errors from the API are shown as dismissible banners with the problem details from the server. Claimants never see the reserve.
 
 ## Design
 

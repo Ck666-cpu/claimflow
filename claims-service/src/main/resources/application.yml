@@ -40,6 +40,7 @@ spring:
       completion-mode: update   # completed rows stay in event_publication (completion_date set) for inspection
 
 springdoc:
+  default-produces-media-type: application/json   # otherwise responses are "*/*" and generated clients treat them as blobs
   api-docs:
     path: /v3/api-docs
   swagger-ui:

@@ -32,7 +32,7 @@ paths:
         "200":
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/ClaimDetail"
   /api/v1/claims:
@@ -74,7 +74,7 @@ paths:
         "200":
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 type: array
                 items:
@@ -101,7 +101,7 @@ paths:
         "200":
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/ClaimDetail"
   /api/v1/claims/{id}/withdraw:
@@ -127,7 +127,7 @@ paths:
         "200":
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/ClaimDetail"
   /api/v1/claims/{id}/settle:
@@ -153,7 +153,7 @@ paths:
         "200":
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/ClaimDetail"
   /api/v1/claims/{id}/info-requests:
@@ -179,7 +179,7 @@ paths:
         "200":
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/ClaimDetail"
   /api/v1/claims/{id}/info-requests/{requestId}/response:
@@ -211,7 +211,7 @@ paths:
         "200":
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/ClaimDetail"
   /api/v1/claims/{id}/decision:
@@ -238,7 +238,7 @@ paths:
         "200":
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/ClaimDetail"
   /api/v1/claims/{id}/assign:
@@ -265,7 +265,7 @@ paths:
         "200":
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/ClaimDetail"
   /api/v1/metrics/workload:
@@ -279,7 +279,7 @@ paths:
         "200":
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/WorkloadReport"
   /api/v1/metrics/exposure:
@@ -293,7 +293,7 @@ paths:
         "200":
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/ExposureReport"
   /api/v1/claims/{id}:
@@ -314,7 +314,7 @@ paths:
         "200":
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: "#/components/schemas/ClaimDetail"
   /api/v1/claims/mine:
@@ -327,7 +327,7 @@ paths:
         "200":
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 type: array
                 items:

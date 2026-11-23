@@ -1,1 +1,181 @@
-/* You can add global styles to this file, and also import other style files */
+/* ClaimFlow: plain SCSS, no component library. Colours, spacing and radius live in these variables. */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --border: #dde1e6;
+  --text: #1f2933;
+  --text-muted: #616e7c;
+  --accent: #2f6fdb;
+  --accent-soft: #dce7fb;
+  --danger: #c62828;
+  --danger-soft: #fdecea;
+  --success: #2e7d32;
+  --success-soft: #e8f5e9;
+  --warning: #b26a00;
+  --warning-soft: #fff4e0;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --radius: 8px;
+
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  color: var(--text);
+  background: var(--bg);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+}
+
+h1 {
+  font-size: 1.5rem;
+  margin: 0 0 var(--space-2);
+}
+
+h2 {
+  font-size: 1.15rem;
+  margin: 0 0 var(--space-3);
+}
+
+a {
+  color: var(--accent);
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+}
+
+button,
+.button {
+  font: inherit;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius);
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+
+button.secondary,
+.button.secondary {
+  background: var(--surface);
+  color: var(--accent);
+}
+
+button.danger {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+button.link {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 0 var(--space-1);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  width: 100%;
+}
+
+input.ng-invalid.ng-touched,
+select.ng-invalid.ng-touched,
+textarea.ng-invalid.ng-touched {
+  border-color: var(--danger);
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-weight: 500;
+}
+
+.field-error {
+  color: var(--danger);
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+th,
+td {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+
+th {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  background: var(--bg);
+}
+
+tr.clickable {
+  cursor: pointer;
+}
+
+tr.clickable:hover td {
+  background: var(--accent-soft);
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+td strong {
+  white-space: nowrap;
+}
+
+.breach {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* Wide tables scroll inside their own box instead of pushing the page sideways */
+.table-wrap {
+  overflow-x: auto;
+  border-radius: var(--radius);
+}
