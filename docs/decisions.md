@@ -49,3 +49,15 @@ Short records of the decisions the panel is most likely to probe. Each: decision
 
 **Decision.** Seeded users and an `X-User-Id` header; role checks on every endpoint.
 **Why.** Real OIDC is out of the time box. Authorization rules (who may do what) are still enforced and tested.
+
+## ADR-10: Integration envelope separate from domain events
+
+**Decision.** Kafka carries `ClaimEventMessage` (eventId, eventType, schemaVersion, claimId, referenceNo, claimantId, actorId, occurredAt, payload), mapped from the internal `ClaimEvents.*` records at the externalization boundary. Consumers parse their own copy of the envelope; no Java classes are shared between services. Details: [`events.md`](events.md).
+**Why.** Domain events are shaped for the aggregate and change when the domain model is refactored; the envelope is a published contract that changes only on purpose. `schemaVersion` lets the contract evolve: additive fields keep version 1 (consumers ignore unknown fields), a breaking change bumps the version so consumers can handle both. Money is a two-decimal string, so no consumer loses precision to JSON numbers.
+**Trade-off.** One mapping to maintain per event type (an exhaustive `switch` over the sealed interface, so a new event cannot be forgotten). No schema registry: the contract is documented and tested, not enforced by the broker.
+
+## ADR-11: Scheduled resubmission of incomplete publications
+
+**Decision.** `IncompleteEventResubmitter` calls Modulith's `resubmitIncompletePublicationsOlderThan(30 s)` every 30 s, in addition to republishing outstanding events on restart.
+**Why.** A broker outage longer than the producer's own timeout leaves outbox rows incomplete. Republish-on-restart alone would need someone to restart the service; the scheduled job heals the gap on its own within about 30 s of Kafka coming back (verified in the failure demo in `events.md`).
+**Trade-off.** More duplicates: a resubmission can race a slow original send, so the same event may be published twice. That is already within the at-least-once contract (consumers de-duplicate on `eventId`). With several instances, each would resubmit the same rows; acceptable for now, a scheduler lock (e.g. ShedLock) is the fix at scale.

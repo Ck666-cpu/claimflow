@@ -297,3 +297,31 @@ Content-Type: application/json
         client.assert(response.body.assigneeId === "00000000-0000-0000-0000-000000000012"));
     client.test("status unchanged", () => client.assert(response.body.status === "UNDER_REVIEW"));
 %}
+
+#######################################################################
+# Notifications (notification-service on :8081). Events arrive via Kafka a moment after each
+# action, so run these a few seconds after the requests above.
+#######################################################################
+
+### 21. Alice's notifications: the lifecycle of her claim, newest first
+GET http://localhost:8081/api/v1/notifications/mine
+X-User-Id: {{alice}}
+
+> {%
+    client.test("200", () => client.assert(response.status === 200, "status " + response.status));
+    const forClaim = response.body.filter(n => n.claimId === client.global.get("claimId")).map(n => n.eventType);
+    client.test("lifecycle notifications for the claim", () => client.assert(
+        JSON.stringify(forClaim) === JSON.stringify(
+            ["ClaimSettled", "ClaimApproved", "InformationRequested", "ClaimAssigned", "ClaimSubmitted"]),
+        JSON.stringify(forClaim)));
+%}
+
+### 22. Ben's notifications: "The claimant replied on claim ..."
+GET http://localhost:8081/api/v1/notifications/mine
+X-User-Id: {{ben}}
+
+> {%
+    client.test("200", () => client.assert(response.status === 200, "status " + response.status));
+    client.test("claimant replied", () => client.assert(response.body.some(n =>
+        n.claimId === client.global.get("claimId") && n.message.startsWith("The claimant replied on claim"))));
+%}

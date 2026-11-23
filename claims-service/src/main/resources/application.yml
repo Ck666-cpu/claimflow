@@ -25,8 +25,9 @@ spring:
       properties:
         enable.idempotence: true
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      # value serialization is configured by Modulith's Kafka externalization (JSON);
-      # verify the published payload in step 4 before building the consumer against it
+      # Modulith 2.0 turns the envelope into JSON bytes itself (ByteArrayJacksonJsonMessageConverter,
+      # using Boot's Jackson 3 JsonMapper), so the producer only passes the bytes through.
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
 
   modulith:
     events:
@@ -36,6 +37,7 @@ spring:
       externalization:
         enabled: true
       republish-outstanding-events-on-restart: true
+      completion-mode: update   # completed rows stay in event_publication (completion_date set) for inspection
 
 springdoc:
   api-docs:
@@ -52,3 +54,6 @@ management:
 claimflow:
   sla-days: 10                  # open claims older than this count as SLA breaches
   events-topic: claims.events
+  events-replication: 1         # local single broker; production 3 (with min.insync.replicas=2)
+  outbox:
+    resubmit-interval: PT30S    # how often incomplete outbox entries older than 30 s are re-sent

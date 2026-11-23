@@ -37,7 +37,15 @@ Or run everything except the frontend in containers:
 docker compose --profile app up -d --build
 ```
 
-Useful URLs: Swagger UI http://localhost:8080/swagger-ui.html · health http://localhost:8080/actuator/health
+Useful URLs: Swagger UI http://localhost:8080/swagger-ui.html · health http://localhost:8080/actuator/health · notifications Swagger UI http://localhost:8081/swagger-ui.html
+
+Watch claim events on Kafka (envelope, topic, delivery guarantee and failure demo: [`docs/events.md`](docs/events.md)):
+
+```bash
+docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic claims.events --from-beginning --property print.key=true --property print.headers=true
+```
+
+`mvn verify` also runs the Testcontainers integration tests (`*IT`), so Docker must be running.
 
 ## Demo users (seeded)
 
@@ -54,6 +62,7 @@ Real authentication is out of scope. The frontend sends an `X-User-Id` header fo
 ## Design
 
 - Decisions and trade-offs: [`docs/decisions.md`](docs/decisions.md)
+- Events on Kafka (contract, delivery, dead letters, failure demo): [`docs/events.md`](docs/events.md)
 - AI working journal: [`AI_JOURNAL.md`](AI_JOURNAL.md)
 
 Claim lifecycle: `SUBMITTED → UNDER_REVIEW ⇄ INFO_REQUESTED → APPROVED → SETTLED`, with `REJECTED` from review and `WITHDRAWN` before a decision.

@@ -31,6 +31,9 @@ spring:
       enable-auto-commit: false # offset committed only after the listener finishes
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:                   # only used to forward failed records to claims.events.DLT, unchanged
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
 
 management:
   endpoints:
@@ -40,3 +43,4 @@ management:
 
 claimflow:
   events-topic: claims.events
+  events-replication: 1         # for claims.events.DLT; local single broker, production 3
