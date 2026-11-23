@@ -1,0 +1,54 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: claims-service
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/claimflow}
+    username: ${DB_USER:claimflow}
+    password: ${DB_PASSWORD:claimflow}
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate        # Flyway owns the schema; Hibernate only checks it
+
+  flyway:
+    enabled: true               # V1 schema, V2 seed data
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      acks: all                 # broker confirms only when all in-sync replicas have the record
+      properties:
+        enable.idempotence: true
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      # value serialization is configured by Modulith's Kafka externalization (JSON);
+      # verify the published payload in step 4 before building the consumer against it
+
+  modulith:
+    events:
+      jdbc:
+        schema-initialization:
+          enabled: true         # creates the event_publication (outbox) table
+      externalization:
+        enabled: true
+      republish-outstanding-events-on-restart: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,modulith
+
+claimflow:
+  sla-days: 10                  # open claims older than this count as SLA breaches
+  events-topic: claims.events
