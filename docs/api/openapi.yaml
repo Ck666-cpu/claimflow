@@ -1,0 +1,753 @@
+openapi: 3.1.0
+info:
+  title: ClaimFlow claims API
+  description: "Stub authentication: send a seeded user id in the X-User-Id header."
+  version: v1
+servers:
+- url: http://localhost:8080
+  description: Generated server url
+security:
+- userId: []
+paths:
+  /api/v1/claims/{id}/reserve:
+    put:
+      tags:
+      - Claims
+      summary: Set the reserve during assessment (assigned officer or lead)
+      operationId: changeReserve
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReserveRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ClaimDetail"
+  /api/v1/claims:
+    get:
+      tags:
+      - Claims
+      summary: "Search claims (staff): unassigned=true for the work queue, assignee=me|{userId},\
+        \ status filter (default: open statuses)"
+      operationId: search
+      parameters:
+      - name: unassigned
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+      - name: assignee
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - SUBMITTED
+            - UNDER_REVIEW
+            - INFO_REQUESTED
+            - APPROVED
+            - SETTLED
+            - REJECTED
+            - WITHDRAWN
+          uniqueItems: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ClaimSummary"
+    post:
+      tags:
+      - Claims
+      summary: Submit a claim (claimant). Replaying an Idempotency-Key returns the
+        original claim with 200.
+      operationId: submit
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitClaimRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ClaimDetail"
+  /api/v1/claims/{id}/withdraw:
+    post:
+      tags:
+      - Claims
+      summary: Withdraw a claim before a decision (owning claimant)
+      operationId: withdraw
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VersionRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ClaimDetail"
+  /api/v1/claims/{id}/settle:
+    post:
+      tags:
+      - Claims
+      summary: Mark an approved claim as settled (assigned officer or lead)
+      operationId: settle
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VersionRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ClaimDetail"
+  /api/v1/claims/{id}/info-requests:
+    post:
+      tags:
+      - Claims
+      summary: Ask the claimant for more information (assigned officer or lead)
+      operationId: requestInformation
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInformationRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ClaimDetail"
+  /api/v1/claims/{id}/info-requests/{requestId}/response:
+    post:
+      tags:
+      - Claims
+      summary: Answer an open information request (owning claimant)
+      operationId: respond
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: requestId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InformationResponseRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ClaimDetail"
+  /api/v1/claims/{id}/decision:
+    post:
+      tags:
+      - Claims
+      summary: Approve (with approvedAmount) or reject (with reason) a claim under
+        review
+      operationId: decide
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DecisionRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ClaimDetail"
+  /api/v1/claims/{id}/assign:
+    post:
+      tags:
+      - Claims
+      summary: "Assign a claim: an officer picks it up for themselves; a lead assigns\
+        \ or reassigns to an officer"
+      operationId: assign
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ClaimDetail"
+  /api/v1/metrics/workload:
+    get:
+      tags:
+      - Metrics
+      summary: "Team workload: queue, claims waiting on claimants, SLA breaches, per-officer\
+        \ load (officer or lead)"
+      operationId: workload
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WorkloadReport"
+  /api/v1/metrics/exposure:
+    get:
+      tags:
+      - Metrics
+      summary: Outstanding exposure (sum of reserves on open claims) per market and
+        currency (lead only)
+      operationId: exposure
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ExposureReport"
+  /api/v1/claims/{id}:
+    get:
+      tags:
+      - Claims
+      summary: "Claim detail with history and information requests (staff: any claim;\
+        \ claimant: own)"
+      operationId: detail
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ClaimDetail"
+  /api/v1/claims/mine:
+    get:
+      tags:
+      - Claims
+      summary: "My claims, newest first (claimant)"
+      operationId: mine
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ClaimSummary"
+components:
+  schemas:
+    ReserveRequest:
+      type: object
+      properties:
+        amount:
+          type: number
+          minimum: 0.00
+        version:
+          type: integer
+          format: int64
+      required:
+      - amount
+      - version
+    ClaimDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        referenceNo:
+          type: string
+        type:
+          type: string
+          enum:
+          - MOTOR
+          - PROPERTY
+        marketCode:
+          type: string
+        currency:
+          type: string
+        policyNumber:
+          type: string
+        incidentDate:
+          type: string
+          format: date
+        description:
+          type: string
+        claimedAmount:
+          type: number
+        reserveAmount:
+          type: number
+        approvedAmount:
+          type: number
+        status:
+          type: string
+          enum:
+          - SUBMITTED
+          - UNDER_REVIEW
+          - INFO_REQUESTED
+          - APPROVED
+          - SETTLED
+          - REJECTED
+          - WITHDRAWN
+        rejectionReason:
+          type: string
+        claimantId:
+          type: string
+          format: uuid
+        assigneeId:
+          type: string
+          format: uuid
+        submittedAt:
+          type: string
+          format: date-time
+        decidedAt:
+          type: string
+          format: date-time
+        settledAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        ageDays:
+          type: integer
+          format: int64
+        slaBreached:
+          type: boolean
+        allowedNext:
+          type: array
+          items:
+            type: string
+            enum:
+            - SUBMITTED
+            - UNDER_REVIEW
+            - INFO_REQUESTED
+            - APPROVED
+            - SETTLED
+            - REJECTED
+            - WITHDRAWN
+          uniqueItems: true
+        version:
+          type: integer
+          format: int64
+        history:
+          type: array
+          items:
+            $ref: "#/components/schemas/HistoryItem"
+        informationRequests:
+          type: array
+          items:
+            $ref: "#/components/schemas/InformationRequestItem"
+    HistoryItem:
+      type: object
+      properties:
+        fromStatus:
+          type: string
+          enum:
+          - SUBMITTED
+          - UNDER_REVIEW
+          - INFO_REQUESTED
+          - APPROVED
+          - SETTLED
+          - REJECTED
+          - WITHDRAWN
+        toStatus:
+          type: string
+          enum:
+          - SUBMITTED
+          - UNDER_REVIEW
+          - INFO_REQUESTED
+          - APPROVED
+          - SETTLED
+          - REJECTED
+          - WITHDRAWN
+        actorId:
+          type: string
+          format: uuid
+        reason:
+          type: string
+        occurredAt:
+          type: string
+          format: date-time
+    InformationRequestItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        question:
+          type: string
+        response:
+          type: string
+        status:
+          type: string
+          enum:
+          - OPEN
+          - ANSWERED
+        requestedBy:
+          type: string
+          format: uuid
+        requestedAt:
+          type: string
+          format: date-time
+        respondedAt:
+          type: string
+          format: date-time
+    SubmitClaimRequest:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+          - MOTOR
+          - PROPERTY
+        marketCode:
+          type: string
+          maxLength: 2
+          minLength: 2
+        policyNumber:
+          type: string
+          maxLength: 50
+          minLength: 0
+        incidentDate:
+          type: string
+          format: date
+        description:
+          type: string
+          maxLength: 4000
+          minLength: 0
+        claimedAmount:
+          type: number
+          minimum: 0.01
+      required:
+      - claimedAmount
+      - description
+      - incidentDate
+      - marketCode
+      - policyNumber
+      - type
+    VersionRequest:
+      type: object
+      properties:
+        version:
+          type: integer
+          format: int64
+      required:
+      - version
+    CreateInformationRequest:
+      type: object
+      properties:
+        question:
+          type: string
+          maxLength: 4000
+          minLength: 0
+        version:
+          type: integer
+          format: int64
+      required:
+      - question
+      - version
+    InformationResponseRequest:
+      type: object
+      properties:
+        response:
+          type: string
+          maxLength: 4000
+          minLength: 0
+        version:
+          type: integer
+          format: int64
+      required:
+      - response
+      - version
+    DecisionRequest:
+      type: object
+      properties:
+        outcome:
+          type: string
+          enum:
+          - APPROVE
+          - REJECT
+        approvedAmount:
+          type: number
+          minimum: 0.01
+        reason:
+          type: string
+          maxLength: 4000
+          minLength: 0
+        version:
+          type: integer
+          format: int64
+      required:
+      - outcome
+      - version
+    AssignRequest:
+      type: object
+      properties:
+        assigneeId:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          format: int64
+      required:
+      - version
+    OfficerWorkload:
+      type: object
+      properties:
+        officerId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        open:
+          type: integer
+          format: int64
+        byStatus:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+        slaBreaches:
+          type: integer
+          format: int64
+        decidedLast7Days:
+          type: integer
+          format: int64
+        avgDaysToDecisionLast30:
+          type: number
+    Queue:
+      type: object
+      properties:
+        unassigned:
+          type: integer
+          format: int64
+        oldestAgeDays:
+          type: integer
+          format: int32
+    Totals:
+      type: object
+      properties:
+        open:
+          type: integer
+          format: int64
+        slaBreaches:
+          type: integer
+          format: int64
+    WaitingOnClaimant:
+      type: object
+      properties:
+        count:
+          type: integer
+          format: int64
+        oldestWaitingDays:
+          type: integer
+          format: int32
+    WorkloadReport:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        slaDays:
+          type: integer
+          format: int32
+        queue:
+          $ref: "#/components/schemas/Queue"
+        waitingOnClaimant:
+          $ref: "#/components/schemas/WaitingOnClaimant"
+        totals:
+          $ref: "#/components/schemas/Totals"
+        officers:
+          type: array
+          items:
+            $ref: "#/components/schemas/OfficerWorkload"
+    ExposureReport:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        markets:
+          type: array
+          items:
+            $ref: "#/components/schemas/MarketExposure"
+    MarketExposure:
+      type: object
+      properties:
+        marketCode:
+          type: string
+        marketName:
+          type: string
+        currency:
+          type: string
+        openClaims:
+          type: integer
+          format: int64
+        totalReserve:
+          type: string
+        byType:
+          type: object
+          additionalProperties:
+            type: string
+        byStatus:
+          type: object
+          additionalProperties:
+            type: string
+        ageing:
+          type: object
+          additionalProperties:
+            type: string
+    ClaimSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        referenceNo:
+          type: string
+        type:
+          type: string
+          enum:
+          - MOTOR
+          - PROPERTY
+        marketCode:
+          type: string
+        currency:
+          type: string
+        claimedAmount:
+          type: number
+        reserveAmount:
+          type: number
+        status:
+          type: string
+          enum:
+          - SUBMITTED
+          - UNDER_REVIEW
+          - INFO_REQUESTED
+          - APPROVED
+          - SETTLED
+          - REJECTED
+          - WITHDRAWN
+        claimantId:
+          type: string
+          format: uuid
+        assigneeId:
+          type: string
+          format: uuid
+        submittedAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        ageDays:
+          type: integer
+          format: int64
+        slaBreached:
+          type: boolean
+        version:
+          type: integer
+          format: int64
+  securitySchemes:
+    userId:
+      type: apiKey
+      name: X-User-Id
+      in: header

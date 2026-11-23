@@ -325,3 +325,33 @@ X-User-Id: {{ben}}
     client.test("claimant replied", () => client.assert(response.body.some(n =>
         n.claimId === client.global.get("claimId") && n.message.startsWith("The claimant replied on claim"))));
 %}
+
+#######################################################################
+# Metrics (claims-service). Workload: officers and leads. Exposure: leads only.
+#######################################################################
+
+### 23. Workload as Ben (officer)
+GET {{host}}/api/v1/metrics/workload
+X-User-Id: {{ben}}
+
+> {%
+    client.test("200", () => client.assert(response.status === 200, "status " + response.status));
+    client.test("every officer listed", () => client.assert(response.body.officers.length >= 2));
+%}
+
+### 24. Exposure as Daniel (lead): every market, money per currency
+GET {{host}}/api/v1/metrics/exposure
+X-User-Id: {{daniel}}
+
+> {%
+    client.test("200", () => client.assert(response.status === 200, "status " + response.status));
+    client.test("all six markets", () => client.assert(response.body.markets.length === 6));
+%}
+
+### 25. 403: exposure as Ben (officers cannot see exposure)
+GET {{host}}/api/v1/metrics/exposure
+X-User-Id: {{ben}}
+
+> {%
+    client.test("403", () => client.assert(response.status === 403, "status " + response.status));
+%}
