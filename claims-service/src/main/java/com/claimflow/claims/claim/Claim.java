@@ -24,6 +24,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import org.hibernate.annotations.OptimisticLock;
 import org.springframework.data.domain.AbstractAggregateRoot;
 
 import java.math.BigDecimal;
@@ -108,19 +109,25 @@ public class Claim extends AbstractAggregateRoot<Claim> {
     @Version
     private Long version;
 
+    // Child collections are excluded from optimistic locking: otherwise Hibernate issues an extra
+    // "update claims set version" when they change (a new claim would start at version 1). Every
+    // command that adds a child also changes status or updatedAt, so the version still moves.
     @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JoinColumn(name = "claim_id", nullable = false, updatable = false)
     @OrderBy("occurredAt ASC")
+    @OptimisticLock(excluded = true)
     private List<StatusHistoryEntry> history = new ArrayList<>();
 
     @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JoinColumn(name = "claim_id", nullable = false, updatable = false)
     @OrderBy("requestedAt ASC")
+    @OptimisticLock(excluded = true)
     private List<InformationRequest> informationRequests = new ArrayList<>();
 
     @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JoinColumn(name = "claim_id", nullable = false, updatable = false)
     @OrderBy("occurredAt ASC")
+    @OptimisticLock(excluded = true)
     private List<ReserveChange> reserveChanges = new ArrayList<>();
 
     protected Claim() {

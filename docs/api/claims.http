@@ -1,0 +1,299 @@
+### ClaimFlow claims API: IntelliJ HTTP Client script
+# Run top to bottom (Run All). Each request asserts its expected status; ids and versions are
+# carried forward in global variables. Needs: docker compose up -d, claims-service on :8080.
+#
+# Seeded users (V2__seed.sql)
+@host = http://localhost:8080
+@alice = 00000000-0000-0000-0000-000000000001
+@raj = 00000000-0000-0000-0000-000000000002
+@ben = 00000000-0000-0000-0000-000000000011
+@chitra = 00000000-0000-0000-0000-000000000012
+@daniel = 00000000-0000-0000-0000-000000000021
+
+#######################################################################
+# Happy path: submit -> queue -> assign -> info -> respond -> reserve -> approve -> settle
+#######################################################################
+
+### 1. Alice submits a claim (201 + Location)
+< {%
+    client.global.set("idemKey", "demo-" + Date.now());
+%}
+POST {{host}}/api/v1/claims
+X-User-Id: {{alice}}
+Idempotency-Key: {{idemKey}}
+Content-Type: application/json
+
+{
+  "type": "MOTOR",
+  "marketCode": "SG",
+  "policyNumber": "POL-SG-9001",
+  "incidentDate": "2026-11-20",
+  "description": "Rear-ended at a traffic light, bumper and boot lid damaged.",
+  "claimedAmount": 3200.00
+}
+
+> {%
+    client.test("201 Created", () => client.assert(response.status === 201, "status " + response.status));
+    client.test("Location header", () => client.assert(response.headers.valueOf("Location").endsWith(response.body.id)));
+    client.test("reserve hidden from claimant", () => client.assert(response.body.reserveAmount === null));
+    client.test("new claim starts at version 0", () => client.assert(response.body.version === 0));
+    client.global.set("claimId", response.body.id);
+    client.global.set("version", response.body.version);
+%}
+
+### 2. Same Idempotency-Key again returns the same claim (200, nothing new created)
+POST {{host}}/api/v1/claims
+X-User-Id: {{alice}}
+Idempotency-Key: {{idemKey}}
+Content-Type: application/json
+
+{
+  "type": "MOTOR",
+  "marketCode": "SG",
+  "policyNumber": "POL-SG-9001",
+  "incidentDate": "2026-11-20",
+  "description": "Rear-ended at a traffic light, bumper and boot lid damaged.",
+  "claimedAmount": 3200.00
+}
+
+> {%
+    client.test("200 replay", () => client.assert(response.status === 200, "status " + response.status));
+    client.test("same claim", () => client.assert(response.body.id === client.global.get("claimId")));
+%}
+
+### 3. Ben (officer) looks at the work queue
+GET {{host}}/api/v1/claims?unassigned=true
+X-User-Id: {{ben}}
+
+> {%
+    client.test("200", () => client.assert(response.status === 200, "status " + response.status));
+    client.test("new claim is queued", () =>
+        client.assert(response.body.some(c => c.id === client.global.get("claimId"))));
+%}
+
+### 4. Ben picks up the claim (SUBMITTED -> UNDER_REVIEW)
+POST {{host}}/api/v1/claims/{{claimId}}/assign
+X-User-Id: {{ben}}
+Content-Type: application/json
+
+{ "version": {{version}} }
+
+> {%
+    client.test("200", () => client.assert(response.status === 200, "status " + response.status));
+    client.test("under review, assigned to Ben", () => {
+        client.assert(response.body.status === "UNDER_REVIEW");
+        client.assert(response.body.assigneeId === "00000000-0000-0000-0000-000000000011");
+    });
+    client.global.set("version", response.body.version);
+%}
+
+### 5. Ben asks for more information (-> INFO_REQUESTED)
+POST {{host}}/api/v1/claims/{{claimId}}/info-requests
+X-User-Id: {{ben}}
+Content-Type: application/json
+
+{ "question": "Please upload photos of the damage and the police report number.", "version": {{version}} }
+
+> {%
+    client.test("200", () => client.assert(response.status === 200, "status " + response.status));
+    client.test("info requested", () => client.assert(response.body.status === "INFO_REQUESTED"));
+    const requests = response.body.informationRequests;
+    client.global.set("requestId", requests[requests.length - 1].id);
+    client.global.set("version", response.body.version);
+%}
+
+### 6. Alice answers (-> UNDER_REVIEW)
+POST {{host}}/api/v1/claims/{{claimId}}/info-requests/{{requestId}}/response
+X-User-Id: {{alice}}
+Content-Type: application/json
+
+{ "response": "Photos uploaded. Police report SPF-2026-118834.", "version": {{version}} }
+
+> {%
+    client.test("200", () => client.assert(response.status === 200, "status " + response.status));
+    client.test("back under review", () => client.assert(response.body.status === "UNDER_REVIEW"));
+    client.global.set("version", response.body.version);
+%}
+
+### 7. Ben sets the reserve
+PUT {{host}}/api/v1/claims/{{claimId}}/reserve
+X-User-Id: {{ben}}
+Content-Type: application/json
+
+{ "amount": 2900.00, "version": {{version}} }
+
+> {%
+    client.test("200", () => client.assert(response.status === 200, "status " + response.status));
+    client.test("reserve updated", () => client.assert(response.body.reserveAmount === 2900));
+    client.global.set("version", response.body.version);
+%}
+
+### 8. Ben approves (reserve becomes the approved amount)
+POST {{host}}/api/v1/claims/{{claimId}}/decision
+X-User-Id: {{ben}}
+Content-Type: application/json
+
+{ "outcome": "APPROVE", "approvedAmount": 2750.00, "version": {{version}} }
+
+> {%
+    client.test("200", () => client.assert(response.status === 200, "status " + response.status));
+    client.test("approved", () => {
+        client.assert(response.body.status === "APPROVED");
+        client.assert(response.body.reserveAmount === 2750);
+    });
+    client.global.set("version", response.body.version);
+%}
+
+### 9. Ben settles (reserve released)
+POST {{host}}/api/v1/claims/{{claimId}}/settle
+X-User-Id: {{ben}}
+Content-Type: application/json
+
+{ "version": {{version}} }
+
+> {%
+    client.test("200", () => client.assert(response.status === 200, "status " + response.status));
+    client.test("settled", () => {
+        client.assert(response.body.status === "SETTLED");
+        client.assert(response.body.reserveAmount === 0);
+    });
+    client.global.set("version", response.body.version);
+%}
+
+### 10. Alice reads her claim (full history, no reserve)
+GET {{host}}/api/v1/claims/{{claimId}}
+X-User-Id: {{alice}}
+
+> {%
+    client.test("200", () => client.assert(response.status === 200, "status " + response.status));
+    client.test("history has 6 entries", () => client.assert(response.body.history.length === 6));
+    client.test("reserve hidden", () => client.assert(response.body.reserveAmount === null));
+%}
+
+#######################################################################
+# Failure cases
+#######################################################################
+
+### 11. 409: settle twice
+POST {{host}}/api/v1/claims/{{claimId}}/settle
+X-User-Id: {{ben}}
+Content-Type: application/json
+
+{ "version": {{version}} }
+
+> {%
+    client.test("409", () => client.assert(response.status === 409, "status " + response.status));
+%}
+
+### 12. Setup: Raj submits a second claim
+POST {{host}}/api/v1/claims
+X-User-Id: {{raj}}
+Content-Type: application/json
+
+{
+  "type": "PROPERTY",
+  "marketCode": "MY",
+  "policyNumber": "POL-MY-9002",
+  "incidentDate": "2026-11-15",
+  "description": "Storm blew in the kitchen window.",
+  "claimedAmount": 1800.00
+}
+
+> {%
+    client.test("201", () => client.assert(response.status === 201, "status " + response.status));
+    client.global.set("claim2", response.body.id);
+    client.global.set("claim2StaleVersion", response.body.version);
+%}
+
+### 13. Setup: Ben picks it up
+POST {{host}}/api/v1/claims/{{claim2}}/assign
+X-User-Id: {{ben}}
+Content-Type: application/json
+
+{ "version": {{claim2StaleVersion}} }
+
+> {%
+    client.test("200", () => client.assert(response.status === 200, "status " + response.status));
+    client.global.set("claim2Version", response.body.version);
+%}
+
+### 14. 409: stale version (Ben sends the version from before the assignment)
+PUT {{host}}/api/v1/claims/{{claim2}}/reserve
+X-User-Id: {{ben}}
+Content-Type: application/json
+
+{ "amount": 1500.00, "version": {{claim2StaleVersion}} }
+
+> {%
+    client.test("409", () => client.assert(response.status === 409, "status " + response.status));
+%}
+
+### 15. 403: Chitra acts on Ben's claim
+PUT {{host}}/api/v1/claims/{{claim2}}/reserve
+X-User-Id: {{chitra}}
+Content-Type: application/json
+
+{ "amount": 1500.00, "version": {{claim2Version}} }
+
+> {%
+    client.test("403", () => client.assert(response.status === 403, "status " + response.status));
+%}
+
+### 16. 404: Alice reads Raj's claim
+GET {{host}}/api/v1/claims/{{claim2}}
+X-User-Id: {{alice}}
+
+> {%
+    client.test("404", () => client.assert(response.status === 404, "status " + response.status));
+%}
+
+### 17. 400: validation (future date, zero amount, 3-letter market, no description)
+POST {{host}}/api/v1/claims
+X-User-Id: {{alice}}
+Content-Type: application/json
+
+{
+  "type": "MOTOR",
+  "marketCode": "SGP",
+  "policyNumber": "POL-SG-9003",
+  "incidentDate": "2099-01-01",
+  "description": "",
+  "claimedAmount": 0
+}
+
+> {%
+    client.test("400", () => client.assert(response.status === 400, "status " + response.status));
+    client.test("names each invalid field", () => {
+        const fields = response.body.errors.map(e => e.field).join(",");
+        client.assert(fields === "claimedAmount,description,incidentDate,marketCode", "fields " + fields);
+    });
+%}
+
+### 18. 400: assignee is not "me" or a UUID
+GET {{host}}/api/v1/claims?assignee=nobody
+X-User-Id: {{daniel}}
+
+> {%
+    client.test("400", () => client.assert(response.status === 400, "status " + response.status));
+%}
+
+### 19. 401: missing X-User-Id
+GET {{host}}/api/v1/claims/mine
+
+> {%
+    client.test("401", () => client.assert(response.status === 401, "status " + response.status));
+%}
+
+### 20. Daniel (lead) reassigns Raj's claim from Ben to Chitra
+POST {{host}}/api/v1/claims/{{claim2}}/assign
+X-User-Id: {{daniel}}
+Content-Type: application/json
+
+{ "assigneeId": "{{chitra}}", "version": {{claim2Version}} }
+
+> {%
+    client.test("200", () => client.assert(response.status === 200, "status " + response.status));
+    client.test("now Chitra's", () =>
+        client.assert(response.body.assigneeId === "00000000-0000-0000-0000-000000000012"));
+    client.test("status unchanged", () => client.assert(response.body.status === "UNDER_REVIEW"));
+%}
