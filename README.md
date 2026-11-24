@@ -136,6 +136,31 @@ Claim lifecycle: `SUBMITTED → UNDER_REVIEW ⇄ INFO_REQUESTED → APPROVED →
 - One officer owns a claim at a time; leads can reassign.
 - Open claims older than 10 days count as SLA breaches (`claimflow.sla-days`).
 
-## What is not built (and why)
 
-_Fill in at the end: what you cut, and what you would build next._
+## What I prioritised, and what is not built (and why)
+
+The brief asks for ruthless prioritisation, so I built depth on the backend first: a complete, tested claim lifecycle with reliable events beats a wide but shallow UI.
+
+**Built**
+- Full claim lifecycle API with an explicit state machine, role checks, optimistic locking, idempotent submission and RFC 7807 errors.
+- Domain events stored in a transactional outbox (Spring Modulith) and published to Kafka, keyed by claim for per-claim ordering.
+- Notification service consuming those events, with deduplication and a dead-letter topic.
+- Workload and exposure metrics for staff.
+- Angular app: claimant flow and officer workbench. _(edit: add the lead dashboard if finished)_
+
+**Not built, deliberately**
+
+| Item | Why not | What I would do next |
+| --- | --- | --- |
+| Real authentication | Out of the time box; roles are still enforced via a stubbed `X-User-Id` header | OIDC (e.g. Keycloak) with JWTs; map roles from token claims |
+| Document and photo upload | Storage and virus scanning add infrastructure without showing new design | Object storage with pre-signed URLs; metadata on the claim |
+| Payments | Settlement is recorded, not paid | Integrate a payments service as another event consumer |
+| FX conversion for exposure | Summing across currencies would be wrong without rates | A rates source and a reporting currency, clearly labelled |
+| Live updates (SSE / WebSocket) | Polling every 15 s is enough at demo scale | SSE from a small read service fed by `claims.events` |
+| Paging and search | Demo data volumes | `Pageable` on list endpoints, indexed filters |
+| Production Kafka setup | Single local broker | 3 brokers, replication factor 3, `min.insync.replicas=2`, schema registry |
+| Separate read model for metrics | SQL aggregates are correct and real-time at this scale | Event-fed reporting service consuming `claims.events` |
+
+## How I worked with AI
+
+Planning, design and specs with Claude (chat); implementation with Claude Code in IntelliJ, from the specs in [`docs/prompts/`](docs/prompts/), one part at a time with a review stop and a check after each. Every part was run and reviewed before committing. Details, including what I challenged and overrode: [`AI_JOURNAL.md`](AI_JOURNAL.md).
